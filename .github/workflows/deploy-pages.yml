@@ -1,0 +1,64 @@
+name: Deploy GitHub Pages
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  processing:
+    runs-on: ubuntu-latest
+    container: keishis/testr-env
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Install & Build
+        run: |
+          mkdir -p /tmp/result
+          regex_origin="^remotes\/origin\/([a-z0-9_-]+)$"
+          regex_pull="^remotes\/pull\/([0-9]+)\/merge$"
+          for bch in `git branch -a | sed -e 's/^[ \t]*//g' | sed -n -e '/^remotes\//p'`; do
+            git checkout ${bch}
+            bch_name=""
+            if [[ ${bch} =~ ${regex_origin} ]]; then
+              bch_name=$(echo ${bch} | sed -r "s/${regex_origin}/\1/")
+            elif [[ ${bch} =~ ${regex_pull} ]]; then
+              bch_name=$(echo ${bch} | sed -r "s/${regex_pull}/pr-\1/")
+            else
+              continue
+            fi
+            mkdir -p /tmp/result/${bch_name} result
+            ln -s /tmp/renv/library /tmp/renv/local /tmp/renv/python /tmp/renv/cellar /tmp/renv/staging ./renv/
+            R -q -e "rmarkdown::render('note1.Rmd', output_file = './result/note1.html')"
+            mv ./result/* /tmp/result/${bch_name}/
+            git clean -df .
+          done
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v1
+        with:
+          path: /tmp/result
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v2
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v1
