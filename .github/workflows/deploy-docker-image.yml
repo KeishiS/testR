@@ -1,0 +1,53 @@
+name: Deploy Docker Image
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - dockerfile
+      - renv.lock
+      - .github/workflows/deploy-docker-image.yml
+  pull_request:
+    paths:
+      - dockerfile
+      - renv.lock
+      - .github/workflows/deploy-docker-image.yml
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build_and_push_to_registry:
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v2
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.CR_PAT }}
+
+      - name: Install
+        uses: docker/setup-buildx-action@v2
+        id: buildx
+        with:
+          install: true
+
+      - name: Build
+        env:
+          REGISTRY: ${{ env.REGISTRY }}
+        run: |
+          docker build -t ${REGISTRY}/keishis/testr-env .
+
+      - name: Deploy
+        uses: docker/build-push-action@v3
+        with:
+          push: true
+          tags: ${{ env.REGISTRY }}/keishis/testr-env

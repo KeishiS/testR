@@ -19,7 +19,7 @@ defaults:
 jobs:
   processing:
     runs-on: ubuntu-latest
-    container: keishis/testr-env
+    container: ghcr.io/keishis/testr-env:latest
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
